@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  tea-shop-bot:
+    build: .
+    container_name: tea-shop-agent
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Mount credentials file
+      - ./tea-501906-c4089503eb33.json:/app/tea-501906-c4089503eb33.json:ro
+      # Persist temp photos (optional)
+      - ./temp:/app/temp
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

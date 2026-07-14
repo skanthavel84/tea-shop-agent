@@ -1,0 +1,18 @@
+# Core
+python-telegram-bot>=21.0
+langgraph>=0.2.0
+langchain-groq>=0.2.0
+langchain-core>=0.3.0
+
+# OCR
+paddleocr>=2.9.0
+paddlepaddle>=3.0.0
+
+# Google Sheets
+gspread>=6.0.0
+
+# Config
+python-dotenv>=1.0.0
+
+# Utilities
+Pillow>=10.0.0

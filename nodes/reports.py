@@ -1,0 +1,214 @@
+"""
+Report Node
+
+Generates formatted reports by reading data from Google Sheets.
+Supports daily summaries with per-branch breakdowns, item details,
+aggregated product-wise summaries, and profit calculations.
+"""
+
+import logging
+from datetime import date
+from collections import defaultdict
+from state import AgentState
+from services.google_sheet import sheet_service
+
+logger = logging.getLogger(__name__)
+
+
+def _aggregate_items(items: list) -> list:
+    """
+    Groups a list of items by name (case-insensitive) and sums their amounts.
+    Normalizes item names by title-casing them.
+    Returns sorted list of dicts: [{'item': name, 'amount': total_amount}]
+    """
+    totals = defaultdict(float)
+    for entry in items:
+        name = str(entry.get("item", "Unknown")).strip()
+        # Title case to normalize (e.g. "tea" -> "Tea", "milk tea" -> "Milk Tea")
+        norm_name = name.title()
+        totals[norm_name] += float(entry.get("amount", 0))
+    
+    return [
+        {"item": name, "amount": int(amount) if amount.is_integer() else amount}
+        for name, amount in sorted(totals.items(), key=lambda x: x[1], reverse=True)
+    ]
+
+
+def generate_report(state: AgentState) -> dict:
+    """
+    Generate a daily summary report with branch-wise breakdown and product-wise totals.
+
+    Reads today's sales and expenses from Google Sheets,
+    calculates per-branch totals and profit, and formats a readable report.
+
+    Returns:
+        dict with 'report' string.
+    """
+    try:
+        summary = sheet_service.get_daily_summary()
+        report = _format_report(summary)
+        logger.info(f"Generated branch-wise report for {summary['date']}")
+        return {"report": report}
+
+    except Exception as e:
+        logger.error(f"Report generation failed: {e}", exc_info=True)
+        return {
+            "report": "",
+            "error": f"Failed to generate report: {str(e)}",
+        }
+
+
+def generate_save_confirmation(state: AgentState) -> dict:
+    """
+    Generate a confirmation message after saving data.
+
+    Shows what was saved (including branch) and includes a mini-summary.
+
+    Returns:
+        dict with 'report' string.
+    """
+    parsed = state.get("parsed_json", {})
+    sales = parsed.get("sales", [])
+    expenses = parsed.get("expenses", [])
+    branch = parsed.get("branch", "Main")
+    record_date = parsed.get("date", date.today().strftime("%Y-%m-%d"))
+
+    lines = [
+        f"✅ Data Saved Successfully",
+        f"📅 Date: {record_date}  |  🏪 Branch: {branch}",
+        "",
+    ]
+
+    # Aggregate local entry items
+    agg_sales = _aggregate_items(sales)
+    agg_expenses = _aggregate_items(expenses)
+
+    if agg_sales:
+        lines.append("📈 Sales:")
+        total_sales = 0
+        for item in agg_sales:
+            amount = item.get("amount", 0)
+            lines.append(f"  • {item.get('item')} — ₹{amount}")
+            total_sales += amount
+        lines.append(f"  Total Sales: ₹{total_sales}")
+        lines.append("")
+
+    if agg_expenses:
+        lines.append("📉 Expenses:")
+        total_expenses = 0
+        for item in agg_expenses:
+            amount = item.get("amount", 0)
+            lines.append(f"  • {item.get('item')} — ₹{amount}")
+            total_expenses += amount
+        lines.append(f"  Total Expenses: ₹{total_expenses}")
+        lines.append("")
+
+    if sales and expenses:
+        total_sales = sum(i.get("amount", 0) for i in sales)
+        total_expenses = sum(i.get("amount", 0) for i in expenses)
+        profit = total_sales - total_expenses
+        emoji = "💰" if profit >= 0 else "⚠️"
+        lines.append(f"{emoji} Net Profit ({branch}): ₹{profit}")
+
+    report = "\n".join(lines)
+    return {"report": report}
+
+
+def _format_report(summary: dict) -> str:
+    """
+    Format a daily summary dict into a readable Telegram message
+    with per-branch product breakdowns and grand product totals.
+
+    Args:
+        summary: Dict from GoogleSheetService.get_daily_summary()
+
+    Returns:
+        Formatted report string.
+    """
+    report_date = summary.get("date", "Unknown")
+    branches = summary.get("branches", {})
+    grand_total_sales = summary.get("grand_total_sales", 0)
+    grand_total_expenses = summary.get("grand_total_expenses", 0)
+    grand_profit = summary.get("grand_profit", 0)
+
+    lines = [
+        f"📊 Daily Report — {report_date}",
+        "━" * 30,
+        "",
+    ]
+
+    if not branches:
+        lines.append("📭 No data recorded for today.")
+        return "\n".join(lines)
+
+    # Track overall items for grand product totals
+    all_sales = []
+    all_expenses = []
+
+    # Per-branch sections
+    for branch_name, data in branches.items():
+        b_sales = data.get("sales", [])
+        b_expenses = data.get("expenses", [])
+        b_total_sales = data.get("total_sales", 0)
+        b_total_expenses = data.get("total_expenses", 0)
+        b_profit = data.get("profit", 0)
+
+        # Accumulate for grand totals
+        all_sales.extend(b_sales)
+        all_expenses.extend(b_expenses)
+
+        # Aggregate items per branch
+        agg_sales = _aggregate_items(b_sales)
+        agg_expenses = _aggregate_items(b_expenses)
+
+        lines.append(f"🏪 Branch: {branch_name}")
+        lines.append("─" * 26)
+
+        # Sales
+        if agg_sales:
+            lines.append("  📈 Sales by Product:")
+            for item in agg_sales:
+                lines.append(f"    • {item['item']} — ₹{item['amount']}")
+            lines.append(f"    Subtotal: ₹{b_total_sales}")
+        else:
+            lines.append("  📈 Sales: None")
+
+        # Expenses
+        if agg_expenses:
+            lines.append("  📉 Expenses by Item:")
+            for item in agg_expenses:
+                lines.append(f"    • {item['item']} — ₹{item['amount']}")
+            lines.append(f"    Subtotal: ₹{b_total_expenses}")
+        else:
+            lines.append("  📉 Expenses: None")
+
+        # Branch profit
+        profit_emoji = "💰" if b_profit >= 0 else "📛"
+        lines.append(f"  {profit_emoji} Profit: ₹{b_profit}")
+        lines.append("")
+
+    # Grand totals
+    lines.append("━" * 30)
+    lines.append("📋 GRAND TOTAL (All Branches)")
+    
+    # Grand sales by product
+    grand_agg_sales = _aggregate_items(all_sales)
+    if grand_agg_sales:
+        lines.append("  📈 Sales by Product:")
+        for item in grand_agg_sales:
+            lines.append(f"    • {item['item']}: ₹{item['amount']}")
+    
+    # Grand expenses by item
+    grand_agg_expenses = _aggregate_items(all_expenses)
+    if grand_agg_expenses:
+        lines.append("  📉 Expenses by Item:")
+        for item in grand_agg_expenses:
+            lines.append(f"    • {item['item']}: ₹{item['amount']}")
+            
+    lines.append("  ─" * 13)
+    lines.append(f"  📈 Total Sales:    ₹{grand_total_sales}")
+    lines.append(f"  📉 Total Expenses: ₹{grand_total_expenses}")
+    grand_emoji = "💰" if grand_profit >= 0 else "📛"
+    lines.append(f"  {grand_emoji} Net Profit:     ₹{grand_profit}")
+
+    return "\n".join(lines)
