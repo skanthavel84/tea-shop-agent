@@ -31,9 +31,21 @@ class GoogleSheetService:
     SUMMARY_HEADERS = ["Date", "Branch", "Total Sales", "Total Expenses", "Profit"]
 
     def __init__(self):
-        self.gc = gspread.service_account(
-            filename=settings.GOOGLE_SHEETS_CREDENTIALS_FILE
-        )
+        import json
+        creds_val = settings.GOOGLE_SHEETS_CREDENTIALS_FILE.strip()
+        
+        if creds_val.startswith("{"):
+            logger.info("Loading Google Sheets credentials from JSON env string")
+            try:
+                creds_dict = json.loads(creds_val)
+                self.gc = gspread.service_account_from_dict(creds_dict)
+            except Exception as e:
+                logger.error(f"Failed to parse credentials JSON string: {e}")
+                raise e
+        else:
+            logger.info(f"Loading Google Sheets credentials from file: {creds_val}")
+            self.gc = gspread.service_account(filename=creds_val)
+            
         self.spreadsheet = self.gc.open(settings.GOOGLE_SHEET_NAME)
         self._ensure_worksheets()
 
