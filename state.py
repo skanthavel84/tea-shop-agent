@@ -21,6 +21,9 @@ class AgentState(TypedDict, total=False):
     chat_id: int                # Telegram chat ID for sending replies
     image_path: str             # Local path to downloaded photo (if any)
     has_image: bool             # Whether the message included a photo
+    user_info: str              # Sender identity (username, first name, or ID)
+    resolved_branch: str        # Branch name resolved from ID shortcut (e.g. b1: → "Main")
+
 
     # ── Detect Intent Node ────────────────────────────────────────────
     intent: str                 # ADD_SALES | ADD_EXPENSES | REPORT | HELP

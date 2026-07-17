@@ -12,35 +12,38 @@ from state import AgentState
 logger = logging.getLogger(__name__)
 
 HELP_MESSAGE = """
-🍵 *Tea Shop Accounting Bot*
+🍵 *டீ கடை கணக்கு பாட்*
 
-I can help you track your tea shop's daily sales and expenses across branches!
+கிளைகள் வழியாக உங்கள் டீ கடையின் தினசரி விற்பனை மற்றும் செலவுகளை கண்காணிக்க உதவுகிறேன்!
 
-*How to use:*
+*பயன்படுத்தும் முறை:*
 
-📈 *Add Sales* — Send items with amounts:
-  `Tea 150`
-  `Coffee 90, Samosa 30`
+📈 *விற்பனை சேர்க்க* — பொருட்களை தொகையுடன் அனுப்புங்கள்:
+  `டீ 150`
+  `காபி 90, சமோசா 30`
 
-📉 *Add Expenses* — Mention costs or purchases:
-  `Expense: Milk 450, Sugar 200`
-  `Bought Cups 500`
+📉 *செலவுகள் சேர்க்க* — செலவு அல்லது வாங்கியது என குறிப்பிடுங்கள்:
+  `செலவு: பால் 450, சர்க்கரை 200`
+  `வாங்கியது கப் 500`
 
-🏪 *Specify Branch* — Include branch name:
-  `Branch Main: Tea 150, Coffee 90`
-  `Jayanagar branch: Expense Milk 450`
-  _(Defaults to "Main" if not specified)_
+🏪 *கிளை குறிப்பிட* — கிளை ID குறுக்குவழிகள்:
+  `b1: டீ 150, காபி 90`
+  `#2: செலவு பால் 450`
+  `B3: காபி 90, சமோசா 30`
+  _(கிளை ID பட்டியல் பார்க்க /branches அழுத்துங்கள்)_
+  _(கிளை குறிப்பிடாவிட்டால் "Main" ஆகும்)_
 
-📸 *Image* — Send a photo of a receipt or handwritten note
+📸 *புகைப்படம்* — ரசீது அல்லது கையால் எழுதிய குறிப்பின் புகைப்படம் அனுப்புங்கள்
 
-📊 *Report* — Ask for today's summary:
-  `Today's report`
-  `Show summary`
+📊 *அறிக்கை* — இன்றைய சுருக்கம் கேளுங்கள்:
+  `இன்றைய அறிக்கை`
+  `சுருக்கம் காட்டு`
 
-*Commands:*
-/start — Welcome message
-/report — Today's summary (all branches)
-/help — This help message
+*கட்டளைகள்:*
+/start — வரவேற்பு செய்தி
+/branches — கிளை ID பட்டியல்
+/report — இன்றைய சுருக்கம் (அனைத்து கிளைகள்)
+/help — இந்த உதவி செய்தி
 """.strip()
 
 
@@ -80,17 +83,17 @@ def reply(state: AgentState) -> dict:
             logger.info("Replying with report")
             return {"response": report}
         elif error:
-            return {"response": f"❌ Could not generate report: {error}"}
+            return {"response": f"❌ அறிக்கை உருவாக்க இயலவில்லை: {error}"}
         else:
-            return {"response": "📊 No data available for today's report."}
+            return {"response": "📊 இன்றைய அறிக்கைக்கு தரவு இல்லை."}
 
     # ── Validation failure ────────────────────────────────────────────
     if is_valid is False:
         error_list = "\n".join(f"  • {e}" for e in validation_errors)
         message = (
-            "⚠️ Please verify the following:\n\n"
+            "⚠️ பின்வருவனவற்றை சரிபாருங்கள்:\n\n"
             f"{error_list}\n\n"
-            "Please correct and resend your data."
+            "தரவை திருத்தி மீண்டும் அனுப்புங்கள்."
         )
         logger.info(f"Replying with validation errors ({len(validation_errors)})")
         return {"response": message}
@@ -103,7 +106,7 @@ def reply(state: AgentState) -> dict:
     # ── Sheet write error ─────────────────────────────────────────────
     if sheet_status and sheet_status != "success":
         return {
-            "response": f"❌ Data was extracted but could not be saved:\n{sheet_status}"
+            "response": f"❌ தரவு பிரித்தெடுக்கப்பட்டது ஆனால் சேமிக்க இயலவில்லை:\n{sheet_status}"
         }
 
     # ── Fallback ──────────────────────────────────────────────────────

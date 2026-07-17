@@ -58,8 +58,14 @@ def validate(state: AgentState) -> dict:
             )
 
     # ── Validate branch ───────────────────────────────────────────────
+    # Use resolved_branch from ID shortcut if available
+    resolved_branch = state.get("resolved_branch", "")
     branch = parsed.get("branch", "")
-    if not branch or not str(branch).strip():
+    if resolved_branch:
+        branch = resolved_branch
+        parsed["branch"] = branch
+        logger.info(f"Using resolved branch from ID shortcut: '{branch}'")
+    elif not branch or not str(branch).strip():
         branch = "Main"
         parsed["branch"] = branch
         logger.info("No branch provided, defaulting to 'Main'")

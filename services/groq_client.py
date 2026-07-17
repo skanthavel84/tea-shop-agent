@@ -51,7 +51,7 @@ class GroqClient:
         prompt = self._extraction_prompt.replace("{input_text}", text)
 
         messages = [
-            SystemMessage(content="You are a precise bookkeeping data extractor. Return valid JSON only."),
+            SystemMessage(content="You are a precise bookkeeping data extractor. The input may be in Tamil (தமிழ்) or English or mixed. Return valid JSON only."),
             HumanMessage(content=prompt),
         ]
 
@@ -73,11 +73,16 @@ class GroqClient:
         messages = [
             SystemMessage(content=(
                 "You are an intent classifier for a tea shop accounting bot.\n"
+                "The user's message may be in Tamil (தமிழ்), English, or a mix of both.\n"
                 "Classify the user's message into exactly one of these intents:\n"
                 "- ADD_SALES: User is reporting sales data (items sold with amounts)\n"
+                "  Tamil clues: டீ, காபி, விற்பனை, numbers with item names\n"
                 "- ADD_EXPENSES: User is reporting expenses (purchases, bills, costs)\n"
+                "  Tamil clues: செலவு, வாங்கியது, பில், கொள்முதல்\n"
                 "- REPORT: User wants to see a report or summary\n"
-                "- HELP: User is asking for help or has an unrelated question\n\n"
+                "  Tamil clues: அறிக்கை, சுருக்கம், மொத்தம், இன்றைய\n"
+                "- HELP: User is asking for help or has an unrelated question\n"
+                "  Tamil clues: உதவி, வணக்கம்\n\n"
                 "NOTE: Messages may include a branch name prefix like "
                 "'Branch Main:', 'Jayanagar branch:', etc. Ignore the branch prefix "
                 "and classify based on the actual content.\n\n"
@@ -112,11 +117,12 @@ class GroqClient:
         messages = [
             SystemMessage(content=(
                 "You are a precise bookkeeping data extractor.\n"
+                "The input may be in Tamil (தமிழ்) or English or mixed.\n"
                 "You MUST return ONLY valid JSON. No markdown, no explanation, no code fences.\n"
                 "The JSON must have this exact structure:\n"
                 '{"date": "YYYY-MM-DD", "branch": "BranchName", '
-                '"sales": [{"item": "name", "amount": number}], '
-                '"expenses": [{"item": "name", "amount": number}]}\n'
+                '{"sales": [{"item": "name", "amount": number}], '
+                '{"expenses": [{"item": "name", "amount": number}]}\n'
                 "If there are no sales, use an empty array. Same for expenses.\n"
                 "Use today's date if none is mentioned.\n"
                 'If no branch/location is mentioned, use "Main" as the default branch.'

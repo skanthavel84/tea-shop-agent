@@ -11,6 +11,7 @@ from datetime import date
 from collections import defaultdict
 from state import AgentState
 from services.google_sheet import sheet_service
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -74,33 +75,39 @@ def generate_save_confirmation(state: AgentState) -> dict:
     record_date = parsed.get("date", date.today().strftime("%Y-%m-%d"))
 
     lines = [
-        f"✅ Data Saved Successfully",
-        f"📅 Date: {record_date}  |  🏪 Branch: {branch}",
-        "",
+        f"✅ தரவு வெற்றிகரமாக சேமிக்கப்பட்டது",
     ]
+
+    # Show branch name with ID if available
+    branch_id = settings.BRANCH_ID_MAP.get(branch.lower(), "")
+    if branch_id:
+        lines.append(f"📅 தேதி: {record_date}  |  🏪 கிளை: {branch} (#{branch_id})")
+    else:
+        lines.append(f"📅 தேதி: {record_date}  |  🏪 கிளை: {branch}")
+    lines.append("")
 
     # Aggregate local entry items
     agg_sales = _aggregate_items(sales)
     agg_expenses = _aggregate_items(expenses)
 
     if agg_sales:
-        lines.append("📈 Sales:")
+        lines.append("📈 விற்பனை:")
         total_sales = 0
         for item in agg_sales:
             amount = item.get("amount", 0)
             lines.append(f"  • {item.get('item')} — ₹{amount}")
             total_sales += amount
-        lines.append(f"  Total Sales: ₹{total_sales}")
+        lines.append(f"  மொத்த விற்பனை: ₹{total_sales}")
         lines.append("")
 
     if agg_expenses:
-        lines.append("📉 Expenses:")
+        lines.append("📉 செலவுகள்:")
         total_expenses = 0
         for item in agg_expenses:
             amount = item.get("amount", 0)
             lines.append(f"  • {item.get('item')} — ₹{amount}")
             total_expenses += amount
-        lines.append(f"  Total Expenses: ₹{total_expenses}")
+        lines.append(f"  மொத்த செலவுகள்: ₹{total_expenses}")
         lines.append("")
 
     if sales and expenses:
@@ -108,7 +115,7 @@ def generate_save_confirmation(state: AgentState) -> dict:
         total_expenses = sum(i.get("amount", 0) for i in expenses)
         profit = total_sales - total_expenses
         emoji = "💰" if profit >= 0 else "⚠️"
-        lines.append(f"{emoji} Net Profit ({branch}): ₹{profit}")
+        lines.append(f"{emoji} நிகர லாபம் ({branch}): ₹{profit}")
 
     report = "\n".join(lines)
     return {"report": report}
@@ -132,13 +139,13 @@ def _format_report(summary: dict) -> str:
     grand_profit = summary.get("grand_profit", 0)
 
     lines = [
-        f"📊 Daily Report — {report_date}",
+        f"📊 தினசரி அறிக்கை — {report_date}",
         "━" * 30,
         "",
     ]
 
     if not branches:
-        lines.append("📭 No data recorded for today.")
+        lines.append("📭 இன்றைக்கு தரவு பதிவு செய்யப்படவில்லை.")
         return "\n".join(lines)
 
     # Track overall items for grand product totals
@@ -161,54 +168,59 @@ def _format_report(summary: dict) -> str:
         agg_sales = _aggregate_items(b_sales)
         agg_expenses = _aggregate_items(b_expenses)
 
-        lines.append(f"🏪 Branch: {branch_name}")
+        # Show branch name with ID if available
+        branch_id = settings.BRANCH_ID_MAP.get(branch_name.lower(), "")
+        if branch_id:
+            lines.append(f"🏪 கிளை: {branch_name} (#{branch_id})")
+        else:
+            lines.append(f"🏪 கிளை: {branch_name}")
         lines.append("─" * 26)
 
         # Sales
         if agg_sales:
-            lines.append("  📈 Sales by Product:")
+            lines.append("  📈 பொருள் வாரி விற்பனை:")
             for item in agg_sales:
                 lines.append(f"    • {item['item']} — ₹{item['amount']}")
-            lines.append(f"    Subtotal: ₹{b_total_sales}")
+            lines.append(f"    உப மொத்தம்: ₹{b_total_sales}")
         else:
-            lines.append("  📈 Sales: None")
+            lines.append("  📈 விற்பனை: இல்லை")
 
         # Expenses
         if agg_expenses:
-            lines.append("  📉 Expenses by Item:")
+            lines.append("  📉 பொருள் வாரி செலவுகள்:")
             for item in agg_expenses:
                 lines.append(f"    • {item['item']} — ₹{item['amount']}")
-            lines.append(f"    Subtotal: ₹{b_total_expenses}")
+            lines.append(f"    உப மொத்தம்: ₹{b_total_expenses}")
         else:
-            lines.append("  📉 Expenses: None")
+            lines.append("  📉 செலவுகள்: இல்லை")
 
         # Branch profit
-        profit_emoji = "💰" if b_profit >= 0 else "📛"
-        lines.append(f"  {profit_emoji} Profit: ₹{b_profit}")
+        profit_emoji = "💰" if b_profit >= 0 else "📭"
+        lines.append(f"  {profit_emoji} லாபம்: ₹{b_profit}")
         lines.append("")
 
     # Grand totals
     lines.append("━" * 30)
-    lines.append("📋 GRAND TOTAL (All Branches)")
+    lines.append("📋 மொத்தம் (அனைத்து கிளைகள்)")
     
     # Grand sales by product
     grand_agg_sales = _aggregate_items(all_sales)
     if grand_agg_sales:
-        lines.append("  📈 Sales by Product:")
+        lines.append("  📈 பொருள் வாரி விற்பனை:")
         for item in grand_agg_sales:
             lines.append(f"    • {item['item']}: ₹{item['amount']}")
     
     # Grand expenses by item
     grand_agg_expenses = _aggregate_items(all_expenses)
     if grand_agg_expenses:
-        lines.append("  📉 Expenses by Item:")
+        lines.append("  📉 பொருள் வாரி செலவுகள்:")
         for item in grand_agg_expenses:
             lines.append(f"    • {item['item']}: ₹{item['amount']}")
             
     lines.append("  ─" * 13)
-    lines.append(f"  📈 Total Sales:    ₹{grand_total_sales}")
-    lines.append(f"  📉 Total Expenses: ₹{grand_total_expenses}")
-    grand_emoji = "💰" if grand_profit >= 0 else "📛"
-    lines.append(f"  {grand_emoji} Net Profit:     ₹{grand_profit}")
+    lines.append(f"  📈 மொத்த விற்பனை:    ₹{grand_total_sales}")
+    lines.append(f"  📉 மொத்த செலவுகள்: ₹{grand_total_expenses}")
+    grand_emoji = "💰" if grand_profit >= 0 else "📭"
+    lines.append(f"  {grand_emoji} நிகர லாபம்:     ₹{grand_profit}")
 
     return "\n".join(lines)

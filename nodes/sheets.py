@@ -24,6 +24,7 @@ def write_sheets(state: AgentState) -> dict:
     parsed = state.get("parsed_json", {})
     record_date = parsed.get("date", "")
     branch = parsed.get("branch", "Main")
+    user_info = state.get("user_info", "Unknown")
 
     if not parsed:
         logger.warning("No parsed data to write to sheets")
@@ -36,15 +37,15 @@ def write_sheets(state: AgentState) -> dict:
 
         # Write sales
         if sales:
-            rows_added = sheet_service.append_sales(sales, record_date, branch)
+            rows_added = sheet_service.append_sales(sales, record_date, branch, added_by=user_info)
             total_rows += rows_added
-            logger.info(f"Wrote {rows_added} sales rows for branch '{branch}'")
+            logger.info(f"Wrote {rows_added} sales rows for branch '{branch}' by {user_info}")
 
         # Write expenses
         if expenses:
-            rows_added = sheet_service.append_expenses(expenses, record_date, branch)
+            rows_added = sheet_service.append_expenses(expenses, record_date, branch, added_by=user_info)
             total_rows += rows_added
-            logger.info(f"Wrote {rows_added} expense rows for branch '{branch}'")
+            logger.info(f"Wrote {rows_added} expense rows for branch '{branch}' by {user_info}")
 
         logger.info(f"Total rows written: {total_rows}")
         return {"sheet_status": "success"}

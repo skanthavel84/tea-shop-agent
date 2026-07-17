@@ -20,11 +20,12 @@ def _get_ocr_engine() -> PaddleOCR:
     """Lazy-initialize the OCR engine (singleton)."""
     global _ocr_engine
     if _ocr_engine is None:
-        logger.info(f"Initializing PaddleOCR (lang={settings.OCR_LANGUAGE})")
+        # Use 'ta' for Tamil OCR support. PaddleOCR handles mixed Tamil+English text.
+        ocr_lang = settings.OCR_LANGUAGE
+        logger.info(f"Initializing PaddleOCR (lang={ocr_lang})")
         _ocr_engine = PaddleOCR(
             use_angle_cls=True,
-            lang=settings.OCR_LANGUAGE,
-            show_log=False,
+            lang=ocr_lang,
         )
     return _ocr_engine
 
@@ -52,7 +53,7 @@ def ocr_process(state: AgentState) -> dict:
 
     try:
         ocr = _get_ocr_engine()
-        result = ocr.ocr(image_path, cls=True)
+        result = ocr.ocr(image_path)
 
         if not result or not result[0]:
             logger.warning("OCR returned no results")

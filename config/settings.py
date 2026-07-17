@@ -24,6 +24,36 @@ class Settings:
             "GOOGLE_SHEET_NAME", "TeaShopAccounts"
         )
 
+        # Allowed Telegram users (comma-separated list of user IDs or usernames)
+        allowed_users_raw = os.getenv("ALLOWED_USERS", "")
+        self.ALLOWED_USERS = []
+        for item in allowed_users_raw.split(","):
+            item = item.strip()
+            if not item:
+                continue
+            if item.isdigit():
+                self.ALLOWED_USERS.append(int(item))
+            else:
+                # Remove leading @ if present and convert to lowercase for case-insensitive comparison
+                self.ALLOWED_USERS.append(item.lstrip("@").lower())
+
+
+        # Branch ID mapping (comma-separated pairs of id:name)
+        # Example: BRANCH_MAP=1:Main,2:Jayanagar,3:Koramangala
+        branch_map_raw = os.getenv("BRANCH_MAP", "1:Main")
+        self.BRANCH_MAP: dict = {}          # ID → branch name  (e.g. {"1": "Main"})
+        self.BRANCH_ID_MAP: dict = {}       # branch name (lower) → ID  (e.g. {"main": "1"})
+        for pair in branch_map_raw.split(","):
+            pair = pair.strip()
+            if ":" not in pair:
+                continue
+            bid, bname = pair.split(":", 1)
+            bid = bid.strip()
+            bname = bname.strip()
+            if bid and bname:
+                self.BRANCH_MAP[bid] = bname
+                self.BRANCH_ID_MAP[bname.lower()] = bid
+
         # Groq model configuration
         self.GROQ_MODEL: str = os.getenv(
             "GROQ_MODEL", "llama-3.3-70b-versatile"

@@ -25,9 +25,9 @@ class GoogleSheetService:
     EXPENSES_SHEET = "Expenses"
     SUMMARY_SHEET = "DailySummary"
 
-    # Column headers (with Branch column)
-    SALES_HEADERS = ["Date", "Branch", "Item", "Amount", "Timestamp"]
-    EXPENSES_HEADERS = ["Date", "Branch", "Item", "Amount", "Timestamp"]
+    # Column headers (with Branch and Added By columns)
+    SALES_HEADERS = ["Date", "Branch", "Item", "Amount", "Timestamp", "Added By"]
+    EXPENSES_HEADERS = ["Date", "Branch", "Item", "Amount", "Timestamp", "Added By"]
     SUMMARY_HEADERS = ["Date", "Branch", "Total Sales", "Total Expenses", "Profit"]
 
     def __init__(self):
@@ -70,33 +70,44 @@ class GoogleSheetService:
                 current_values = ws.get_all_values()
                 if current_values:
                     current_headers = current_values[0]
+                    needs_update = False
+                    new_headers = current_headers.copy()
+                    
                     if "Branch" not in current_headers:
                         logger.info(f"Migrating worksheet '{sheet_name}' to include 'Branch' column.")
-                        new_rows = []
-                        # Header row
-                        new_headers = current_headers.copy()
                         new_headers.insert(1, "Branch")
+                        needs_update = True
+                        
+                    if "Added By" not in current_headers and sheet_name in (self.SALES_SHEET, self.EXPENSES_SHEET):
+                        logger.info(f"Migrating worksheet '{sheet_name}' to include 'Added By' column.")
+                        new_headers.append("Added By")
+                        needs_update = True
+                        
+                    if needs_update:
+                        new_rows = []
                         new_rows.append(new_headers)
-                        # Data rows
                         for row in current_values[1:]:
                             new_row = row.copy()
-                            # Insert default branch "Main" at index 1
-                            if len(new_row) >= 1:
-                                new_row.insert(1, "Main")
-                            else:
-                                new_row.append("Main")
+                            # Apply Branch insert if it wasn't in original
+                            if "Branch" not in current_headers:
+                                if len(new_row) >= 1:
+                                    new_row.insert(1, "Main")
+                                else:
+                                    new_row.append("Main")
+                            # Apply Added By append if it wasn't in original
+                            if "Added By" not in current_headers and sheet_name in (self.SALES_SHEET, self.EXPENSES_SHEET):
+                                new_row.append("System")
                             new_rows.append(new_row)
-                        
-                        # Update sheet content
+                            
                         ws.clear()
                         ws.update('A1', new_rows)
-                        logger.info(f"Successfully migrated worksheet '{sheet_name}'.")
+                        logger.info(f"Successfully migrated worksheet '{sheet_name}' to new structure.")
 
     def _get_worksheet(self, name: str) -> gspread.Worksheet:
         """Get a worksheet by name."""
         return self.spreadsheet.worksheet(name)
 
-    def append_sales(self, sales_data: List[Dict], record_date: str, branch: str = "Main") -> int:
+    def append_sales(self, sales_data: List[Dict], record_date: str, branch: str = "Main", added_by: str = "Unknown") -> int:
         """
         Append sales rows to the Sales worksheet.
 
@@ -104,6 +115,7 @@ class GoogleSheetService:
             sales_data: List of dicts with 'item' and 'amount' keys.
             record_date: Date string in YYYY-MM-DD format.
             branch: Branch name.
+            added_by: Sender info.
 
         Returns:
             Number of rows appended.
@@ -119,14 +131,15 @@ class GoogleSheetService:
                 entry.get("item", "Unknown"),
                 entry.get("amount", 0),
                 timestamp,
+                added_by,
             ]
             ws.append_row(row, value_input_option="USER_ENTERED")
             rows_added += 1
-            logger.info(f"Added sale [{branch}]: {entry['item']} ₹{entry['amount']}")
+            logger.info(f"Added sale [{branch}] by {added_by}: {entry['item']} ₹{entry['amount']}")
 
         return rows_added
 
-    def append_expenses(self, expenses_data: List[Dict], record_date: str, branch: str = "Main") -> int:
+    def append_expenses(self, expenses_data: List[Dict], record_date: str, branch: str = "Main", added_by: str = "Unknown") -> int:
         """
         Append expense rows to the Expenses worksheet.
 
@@ -134,6 +147,7 @@ class GoogleSheetService:
             expenses_data: List of dicts with 'item' and 'amount' keys.
             record_date: Date string in YYYY-MM-DD format.
             branch: Branch name.
+            added_by: Sender info.
 
         Returns:
             Number of rows appended.
@@ -149,10 +163,11 @@ class GoogleSheetService:
                 entry.get("item", "Unknown"),
                 entry.get("amount", 0),
                 timestamp,
+                added_by,
             ]
             ws.append_row(row, value_input_option="USER_ENTERED")
             rows_added += 1
-            logger.info(f"Added expense [{branch}]: {entry['item']} ₹{entry['amount']}")
+            logger.info(f"Added expense [{branch}] by {added_by}: {entry['item']} ₹{entry['amount']}")
 
         return rows_added
 

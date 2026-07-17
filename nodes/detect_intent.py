@@ -20,17 +20,20 @@ logger = logging.getLogger(__name__)
 # Keyword patterns for fast intent detection (avoids LLM call)
 REPORT_KEYWORDS = re.compile(
     r"\b(report|summary|total|today'?s?\s*(sales|report|summary)|"
-    r"how\s+much|kitna|aaj\s+ka)\b",
+    r"how\s+much|kitna|aaj\s+ka)\b|"
+    r"(அறிக்கை|சுருக்கம்|மொத்தம்|இன்றைய|எவ்வளவு|விற்பனை\s*அறிக்கை)",
     re.IGNORECASE,
 )
 
 EXPENSE_KEYWORDS = re.compile(
-    r"\b(expense|cost|purchase|bought|kharcha|kharid|bill)\b",
+    r"\b(expense|cost|purchase|bought|kharcha|kharid|bill)\b|"
+    r"(செலவு|செலவுகள்|வாங்கியது|பில்|கொள்முதல்|விலை)",
     re.IGNORECASE,
 )
 
 HELP_KEYWORDS = re.compile(
-    r"\b(help|start|hi|hello|what\s+can\s+you|how\s+to\s+use)\b",
+    r"\b(help|start|hi|hello|what\s+can\s+you|how\s+to\s+use)\b|"
+    r"(உதவி|வணக்கம்|எப்படி\s*பயன்படுத்த)",
     re.IGNORECASE,
 )
 

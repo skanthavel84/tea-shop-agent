@@ -66,6 +66,12 @@ def groq_extract(state: AgentState) -> dict:
 
         logger.info(f"Successfully parsed JSON: {json.dumps(parsed, indent=2)[:200]}")
 
+        # Override branch if a branch ID shortcut was resolved earlier
+        resolved_branch = state.get("resolved_branch", "")
+        if resolved_branch:
+            parsed["branch"] = resolved_branch
+            logger.info(f"Overriding branch with resolved ID: '{resolved_branch}'")
+
         return {
             "parsed_json": parsed,
             "retry_count": retry_count,
