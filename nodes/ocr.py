@@ -6,6 +6,12 @@ Calculates average confidence and flags low-confidence results.
 """
 
 import logging
+import os
+
+# Disable oneDNN/MKLDNN before importing paddle to bypass Windows CPU execution bug
+os.environ["FLAGS_use_mkldnn"] = "0"
+os.environ["PADDLE_PDX_ENABLE_MKLDNN_BYDEFAULT"] = "0"
+
 from paddleocr import PaddleOCR
 from config.settings import settings
 from state import AgentState
@@ -24,7 +30,6 @@ def _get_ocr_engine() -> PaddleOCR:
         ocr_lang = settings.OCR_LANGUAGE
         logger.info(f"Initializing PaddleOCR (lang={ocr_lang})")
         _ocr_engine = PaddleOCR(
-            use_angle_cls=True,
             lang=ocr_lang,
         )
     return _ocr_engine
@@ -67,12 +72,21 @@ def ocr_process(state: AgentState) -> dict:
         lines = []
         confidences = []
 
-        for line_info in result[0]:
-            text = line_info[1][0]       # Detected text
-            confidence = line_info[1][1]  # Confidence score
-            lines.append(text)
-            confidences.append(confidence)
-            logger.debug(f"  OCR line: '{text}' (confidence: {confidence:.3f})")
+        first_item = result[0]
+        if hasattr(first_item, "keys") or isinstance(first_item, dict):
+            # New PaddleOCR/PaddleX style (OCRResult object)
+            lines = list(first_item.get("rec_texts", []))
+            confidences = list(first_item.get("rec_scores", []))
+            for text, confidence in zip(lines, confidences):
+                logger.debug(f"  OCR line: '{text}' (confidence: {confidence:.3f})")
+        else:
+            # Old PaddleOCR style (list of lists)
+            for line_info in first_item:
+                text = line_info[1][0]       # Detected text
+                confidence = line_info[1][1]  # Confidence score
+                lines.append(text)
+                confidences.append(confidence)
+                logger.debug(f"  OCR line: '{text}' (confidence: {confidence:.3f})")
 
         extracted_text = "\n".join(lines)
         avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
