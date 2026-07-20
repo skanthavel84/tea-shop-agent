@@ -43,8 +43,11 @@ class AgentState(TypedDict, total=False):
     # ── Sheets Node ───────────────────────────────────────────────────
     sheet_status: str           # "success" or error description
 
-    # ── Report Node ───────────────────────────────────────────────────
+    # ── Report Node (Enhanced) ────────────────────────────────────────
     report: str                 # Formatted report text
+    report_type: str            # daily | weekly | monthly | custom
+    report_start_date: str      # Start date for range reports (YYYY-MM-DD)
+    report_end_date: str        # End date for range reports (YYYY-MM-DD)
 
     # ── Reply Node ────────────────────────────────────────────────────
     response: str               # Final formatted message sent to user

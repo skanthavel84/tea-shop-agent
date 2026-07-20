@@ -276,6 +276,139 @@ class GoogleSheetService:
             "grand_profit": grand_total_sales - grand_total_expenses,
         }
 
+    def get_sales_for_range(self, start_date: str, end_date: str) -> List[Dict]:
+        """
+        Get all sales between start_date and end_date (inclusive).
+
+        Args:
+            start_date: Start date in YYYY-MM-DD format.
+            end_date: End date in YYYY-MM-DD format.
+
+        Returns:
+            List of dicts with 'date', 'branch', 'item', and 'amount' keys.
+        """
+        ws = self._get_worksheet(self.SALES_SHEET)
+        all_rows = ws.get_all_records()
+
+        return [
+            {
+                "date": row.get("Date", ""),
+                "branch": row.get("Branch", "Main"),
+                "item": row["Item"],
+                "amount": row["Amount"],
+            }
+            for row in all_rows
+            if start_date <= str(row.get("Date", "")) <= end_date
+        ]
+
+    def get_expenses_for_range(self, start_date: str, end_date: str) -> List[Dict]:
+        """
+        Get all expenses between start_date and end_date (inclusive).
+
+        Args:
+            start_date: Start date in YYYY-MM-DD format.
+            end_date: End date in YYYY-MM-DD format.
+
+        Returns:
+            List of dicts with 'date', 'branch', 'item', and 'amount' keys.
+        """
+        ws = self._get_worksheet(self.EXPENSES_SHEET)
+        all_rows = ws.get_all_records()
+
+        return [
+            {
+                "date": row.get("Date", ""),
+                "branch": row.get("Branch", "Main"),
+                "item": row["Item"],
+                "amount": row["Amount"],
+            }
+            for row in all_rows
+            if start_date <= str(row.get("Date", "")) <= end_date
+        ]
+
+    def get_range_summary(self, start_date: str, end_date: str) -> Dict:
+        """
+        Calculate summary for a date range with branch-wise and day-wise breakdown.
+
+        Args:
+            start_date: Start date in YYYY-MM-DD format.
+            end_date: End date in YYYY-MM-DD format.
+
+        Returns:
+            Dict with 'start_date', 'end_date', 'branches', 'daily_totals',
+            and grand totals.
+        """
+        sales = self.get_sales_for_range(start_date, end_date)
+        expenses = self.get_expenses_for_range(start_date, end_date)
+
+        # Group by branch
+        branch_sales = defaultdict(list)
+        branch_expenses = defaultdict(list)
+
+        for item in sales:
+            branch_sales[item["branch"]].append(
+                {"item": item["item"], "amount": item["amount"], "date": item["date"]}
+            )
+
+        for item in expenses:
+            branch_expenses[item["branch"]].append(
+                {"item": item["item"], "amount": item["amount"], "date": item["date"]}
+            )
+
+        # Build per-branch summaries
+        all_branches = sorted(set(list(branch_sales.keys()) + list(branch_expenses.keys())))
+        branches = {}
+        grand_total_sales = 0
+        grand_total_expenses = 0
+
+        for branch in all_branches:
+            b_sales = branch_sales.get(branch, [])
+            b_expenses = branch_expenses.get(branch, [])
+            b_total_sales = sum(item["amount"] for item in b_sales)
+            b_total_expenses = sum(item["amount"] for item in b_expenses)
+            b_profit = b_total_sales - b_total_expenses
+
+            branches[branch] = {
+                "sales": b_sales,
+                "expenses": b_expenses,
+                "total_sales": b_total_sales,
+                "total_expenses": b_total_expenses,
+                "profit": b_profit,
+            }
+
+            grand_total_sales += b_total_sales
+            grand_total_expenses += b_total_expenses
+
+        # Build daily totals
+        daily_sales = defaultdict(float)
+        daily_expenses = defaultdict(float)
+        for item in sales:
+            daily_sales[item["date"]] += item["amount"]
+        for item in expenses:
+            daily_expenses[item["date"]] += item["amount"]
+
+        all_dates = sorted(set(list(daily_sales.keys()) + list(daily_expenses.keys())))
+        daily_totals = []
+        for d in all_dates:
+            ds = daily_sales.get(d, 0)
+            de = daily_expenses.get(d, 0)
+            daily_totals.append({
+                "date": d,
+                "sales": ds,
+                "expenses": de,
+                "profit": ds - de,
+            })
+
+        return {
+            "start_date": start_date,
+            "end_date": end_date,
+            "branches": branches,
+            "daily_totals": daily_totals,
+            "grand_total_sales": grand_total_sales,
+            "grand_total_expenses": grand_total_expenses,
+            "grand_profit": grand_total_sales - grand_total_expenses,
+        }
+
 
 # Singleton instance
 sheet_service = GoogleSheetService()
